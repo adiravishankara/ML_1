@@ -18,9 +18,12 @@ from sklearn import preprocessing
 import matplotlib
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 from matplotlib.figure import Figure
-
+from numpy import genfromtxt
+import math
 
 matplotlib.use("TkAgg")
+R = 10000
+V0 = 5
 
 # Create an ADS1115 ADC (16-bit) instance.
 adc = Adafruit_ADS1x15.ADS1115()
@@ -43,11 +46,17 @@ sensor_input_channel_1 = 2 # Pin on ADC used to read analog signal from first se
 sensor_input_channel_2 = 1 # Pin on ADC used to read analog signal from second sensor in dual channel sensor
 linear_actuator_position_channel = 0 # Pin on ADC used to read analog signal from linear actuator internal position sensor
 
-pumping_time = 20 # time allowed for vacuum pump to draw sample air
+pumping_time = 2 # time allowed for vacuum pump to draw sample air
 flow_stabilization_time = 2 # time allowed for air to settle after vacuum pump is shut off
-sensing_delay_time = 9 # time delay after beginning data acquisition till when the sensor is exposed to sample
+sensing_delay_time = 90 # time delay after beginning data acquisition till when the sensor is exposed to sample
 sensing_retract_time = 50 # time allowed before sensor is retracted, no longer exposed to sample
-duration_of_signal = 200 # time allowed for data acquisition per test run
+duration_of_signal = 20 # time allowed for data acquisition per test run
+
+#pumping_time = 20 # time allowed for vacuum pump to draw sample air
+#flow_stabilization_time = 2 # time allowed for air to settle after vacuum pump is shut off
+#sensing_delay_time = 9 # time delay after beginning data acquisition till when the sensor is exposed to sample
+#sensing_retract_time = 50 # time allowed before sensor is retracted, no longer exposed to sample
+#duration_of_signal = 200 # time allowed for data acquisition per test run
 extended_state = 2.6 # voltage value achieved when linear actuator is extended to correct sensing depth
 retracted_state = 1.5 # voltage value achieved when linear actuator is retracted to idle state
 sampling_time = 0.1 # time between samples taken, determines sampling frequency
@@ -239,81 +248,90 @@ def getSample():
     np.savetxt(r'/home/pi/Documents/Tests/' + str(year) + '/' + str(month) + '/' + str(day) + '/' + str(fileName),
                combinedVector, fmt='%.10f', delimiter=',')
 
+
+
+      
+
     # Perform on-line prediction based on 1NN classifier
-    filepath = '/home/pi/Documents/'
-    x_train = np.transpose( genfromtxt(filepath + 'train.csv', delimiter=',') )
+    #filepath = '/home/pi/Documents/'
+    #x_train = np.transpose( genfromtxt(filepath + 'train.csv', delimiter=',') )
     x_test = dataVector1
-    Y_train = genfromtxt(filepath + 'targets_train_binary.csv', delimiter=',')
+    print(len(x_test))
+    #Y_train = genfromtxt(filepath + 'targets_train_binary.csv', delimiter=',')
 
     # Downsampling parameters
-    desiredTimeBetweenSamples = 1
-    timeBetweenSamples = 0.1
-    samplingRatio = math.floor(desiredTimeBetweenSamples/timeBetweenSamples)
+    #desiredTimeBetweenSamples = 1
+    #timeBetweenSamples = 0.1
+    #samplingRatio = math.floor(desiredTimeBetweenSamples/timeBetweenSamples)
 
-    ### Moving average filter (filters noise)
-    samples = 5
-    smoothedData = np.zeros((x_test.shape[0],x_test.shape[1]))
+    #### Moving average filter (filters noise)
+    #samples = 5
+    #smoothedData = np.zeros(( len(x_test),1 ))
 
-    for j in range(samples, x_test.shape[0]-samples):
-            sum = 0
+    #for j in range(samples, len(x_test)-samples):
+            #sum = 0
 
-            for k in range(-1*samples, samples+1):
-                    sum = sum + x_test[j+k][0]
+            #for k in range(-1*samples, samples+1):
+                    #sum = sum + x_test[j+k]
 
-            smoothedData[j] = sum/(2*samples+1)
+            #smoothedData[j][0] = sum/(2*samples+1)
 
-    for j in range(smoothedData.shape[0]):
-                    if smoothedData[j][0] == 0:
-                            smoothedData[j][0] = x_test[j][0]
+    #for j in range(smoothedData.shape[0]):
+                    #if smoothedData[j][0] == 0:
+                            #smoothedData[j][0] = x_test[j]
 
-    # Downsample
-    downsampledData = np.zeros((1,1))
-    for j in range(smoothedData.shape[0]):
-            if (j%samplingRatio == 0):
-                    if(j == 0):
-                                downsampledData[0][0] = np.array([[smoothedData[j,0]]])
-                    else:
-                            downsampledData = np.vstack((downsampledData,np.array([[smoothedData[j,0]]])))
+    ## Downsample
+    #downsampledData = np.zeros((1,1))
+    #for j in range(smoothedData.shape[0]):
+            #if (j%samplingRatio == 0):
+                    #if(j == 0):
+                                #downsampledData[0][0] = np.array([[smoothedData[j,0]]])
+                    #else:
+                            #downsampledData = np.vstack((downsampledData,np.array([[smoothedData[j,0]]])))
 
     # Convert from voltage to fractional change in conductance
-    for j in range(downsampledData.shape[0]):
-            V = downsampledData[j][0]
-            downsampledData[j][0] = V/(R*(V0-V))
-    x_test = downsampledData
+    #for j in range(downsampledData.shape[0]):
+            #V = downsampledData[j][0]
+            #downsampledData[j][0] = V/(R*(V0-V))
+    #x_test = downsampledData
 
-    post_p = True
-    x_train, x_test = data_representation( x_train, x_test,  prep = 4, rep = 'DWT' )
-    if post_p == True:
-            x_train, x_test = featureProcessing(x_train, x_test)
+    #post_p = True
+    #x_train, x_test = data_representation( x_train, x_test,  prep = 4, rep = 'DWT' )
+    #if post_p == True:
+            #x_train, x_test = featureProcessing(x_train, x_test)
 
-    ### Fit 1NN classifier based on previously collected data
-    clf = KNeighborsClassifier(n_neighbors = 1, algorithm = 'brute')
-    clf.fit(x_train, Y_train)
+    #### Fit 1NN classifier based on previously collected data
+    #clf = KNeighborsClassifier(n_neighbors = 1, algorithm = 'brute')
+    #clf.fit(x_train, Y_train)
 
     ### Predict label of new test
-    y_pred = clf.predict(x_test)
-    if y_pred == 0:
-            print("Sample predicted as being methane")
-    elif y_pred == 1:
-            print("Sample predicted as being natural gas")
-    else:
-            print("Classifier error, please check")
+    #y_pred = clf.predict(x_test)
+    #if y_pred == 0:
+            #print("Sample predicted as being methane")
+    #elif y_pred == 1:
+            #print("Sample predicted as being natural gas")
+    #else:
+            #print("Classifier error, please check")
     
-    if continueTest == False and stopCounter == 0:
-        stopCounter += 1
-        print("test stopped 3")
-        newTest()
-
+    #if continueTest == False and stopCounter == 0:
+        #stopCounter += 1
+        #print("test stopped 3")
+        #newTest()
+        
     ### plot new test
     plotScreen = tk.Toplevel(root)
     plotScreen.geometry('300x200')
-    tk.Label(plotScreen, text="Data plot", width="40", height="5", font=(16)).pack()
-    f = Figure(figsize=(5,5), dpi=100)
-    f.plot(x_test)
-    f.show()
-
     closeButton = tk.Button(plotScreen, text="Close", command=closePlotScreen, font=(16))
-        
+
+    tk.Label(plotScreen, text="Data plot", width="40", height="5", font=(16)).pack()
+    fig = Figure(figsize=(5,5), dpi=100)
+    a = fig.add_subplot(111)
+    a.plot(x_test)
+    
+    canvas = FigureCanvasTkAgg(fig)
+    canvas.get_tk_widget().pack()
+    canvas.draw()
+    
     stopTest()
 ## This function calculates the vltage value read by the ADC  
 def ADC_linear_actuator():
@@ -341,7 +359,8 @@ def exposeAndCollectData():
                                             gain=GAIN))  # Perform analog to digital function, reading voltage from second sensor channel
             timeVector.append(time.time() - start_time)
             sampling_time_index += 1
-            print(ADC_linear_actuator())
+            print(adc.read_adc(sensor_input_channel_1,
+                                            gain=GAIN))
             # increment sampling_time_index to set awaited time for next data sample
         # if ((sampling_time_index - 1) % 10 == 0):
         #                          print(int(time.time() - start_time))
